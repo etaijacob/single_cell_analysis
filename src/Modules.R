@@ -40,6 +40,43 @@ df_data,
   return( sweep( df_data, 2, colSums( df_data), "/" ) )
 }
 
+downSample <- function(counts, dsread = 50000, dsfrac = NULL) {
+  require(DESeq)
+
+  if(is.null(dsfrac)) {
+    counts_ds <- apply(counts, 2, function(k) rbinom(length(k), k, min(dsread/sum(k), 1.0)))
+  } else {
+    counts_ds <- apply(counts, 2, function(k) rbinom(length(k), k, dsfrac))
+  }
+  sfAll_ds <- estimateSizeFactorsForMatrix( counts_ds )
+  nCounts_ds <- t( t(counts_ds) / sfAll_ds )
+  
+  return(nCounts_ds)
+
+}
+
+plot.saturation.curve2 <- function(counts, readBy = 50000, startat = 1000) {
+  require(RColorBrewer)
+
+  ll <- lapply(seq(startat, max(colSums(counts)), readBy), function(x) downSample(counts, dsread = x))
+  ll2 <- lapply(ll, function(x) colSums(x>0))
+  ll3 <- do.call(rbind, ll2)
+  rownames(ll3) <- seq(startat, max(colSums(counts)), readBy)
+  
+  cols <- c("black", brewer.pal(n = 12, name = 'Paired'), rainbow(dim(ll3)[2]))[1:(dim(ll3)[2])]
+  plot(range(rownames(ll3)), range(ll3), type="n", 
+       xlab= "Number of reads samples", ylab = " Number of genes detected")
+  
+  for(i in 1:(dim(ll3)[2])) 
+    lines(rownames(ll3), ll3[,i], type="b", col=cols[i], lwd=2, pch=i)
+  
+  legend("bottomright", inset=.05, 
+         names(counts), col=cols, pch = 1:(dim(ll3)[1]), horiz=F)
+  
+  return(ll3)
+
+}
+
 
 plot.saturation.curve <- function(
 ### in Silico bootstrap cell complexity at varying levels to get a saturation curve for sample depth
